@@ -8,7 +8,10 @@
 
 A self-hosted content repurposing pipeline that watches your blog's RSS feed and automatically generates platform-optimized content for LinkedIn, Twitter/X, Reddit, Email, Dev.to, Hashnode, Indie Hackers, and LinkedIn Carousels — all scheduled on a 7-day drip calendar.
 
-## Why Content Repurposing Matters
+<details>
+<summary><strong>Why Content Repurposing Matters</strong> (click to expand)</summary>
+
+<br>
 
 Most founders write a blog post, share it once on social media, and move on. That's leaving 80% of the value on the table. The research is clear:
 
@@ -23,6 +26,8 @@ Most founders write a blog post, share it once on social media, and move on. Tha
 **The time math works.** Writing 8 pieces of original content from scratch takes 8–16 hours per week. This pipeline produces all 8 from a single blog post with ~30 minutes of human review. Justin Welsh built a $5M+ solo business on this model (his repurposed posts average 3,220 interactions vs. 900 for originals — a 3.5x multiplier). The 7-day drip schedule extends a single article's relevance across an entire week.
 
 **It costs almost nothing.** Each blog post costs ~$0.15 in Claude API calls to transform into all 8 formats. The entire pipeline runs on free, self-hosted infrastructure. Compare that to hiring a content team or paying $200+/month for SaaS repurposing tools that do less.
+
+</details>
 
 ## Pipeline
 
@@ -107,19 +112,23 @@ See [config.example.js](config.example.js) for all options.
 docker compose up -d
 ```
 
-Open http://localhost:5678 — you should see the n8n dashboard.
+Open http://localhost:5678 — you should see the n8n dashboard. The containers run independently of the workflow, so you can start them now while you generate it next.
 
-### 4. Generate and import the workflow
+### 4. Generate the workflow
 
-This reads your `config.js` and generates a customized workflow — run this **after** editing your config:
+This reads your `config.js` and generates a customized n8n workflow:
 
 ```bash
 node n8n/scripts/build-workflow.js
 ```
 
-In n8n: **Add workflow** → **Import from file** → select `n8n/workflows/content-repurposing-pipeline.json`
+### 5. Import the workflow into n8n
 
-### 5. Add your Claude API key
+1. In n8n, click **Add workflow** → **Import from file**
+2. Select `n8n/workflows/content-repurposing-pipeline.json`
+3. **Toggle the workflow to Active** (top-right switch) — workflows are inactive by default
+
+### 6. Add your Claude API key
 
 Get a key at [console.anthropic.com](https://console.anthropic.com/), add it to `.env`, and restart:
 
@@ -127,9 +136,13 @@ Get a key at [console.anthropic.com](https://console.anthropic.com/), add it to 
 docker compose restart
 ```
 
-That's it. Write a blog post, and the engine takes care of the rest.
+### 7. Verify it works
+
+In n8n, open your workflow and click **Test workflow** to run it manually against your latest blog post. You should see content generated for each configured platform and a Slack notification. Once verified, the pipeline will automatically check your RSS feed every 20 minutes for new posts.
 
 ## Drip Schedule
+
+Times are in your configured timezone (set `timezone` and `timezoneOffset` in `config.js`).
 
 | Day | Platform | Time | Method |
 |-----|----------|------|--------|

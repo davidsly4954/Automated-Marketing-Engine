@@ -61,6 +61,7 @@ Open http://localhost:5678 in your browser. You should see the n8n dashboard.
 1. In n8n, click **Add workflow** → **Import from file**
 2. Select `n8n/workflows/content-repurposing-pipeline.json`
 3. The workflow should appear with all 17 nodes
+4. **Toggle the workflow to Active** using the switch in the top-right corner — workflows are inactive by default and won't run until activated
 
 ### 1.6 Add Your Claude API Key
 1. Sign up at https://console.anthropic.com/
@@ -163,7 +164,8 @@ After setup, verify everything works:
 
 - [ ] `docker compose ps` shows both `n8n` and `postgres` running
 - [ ] http://localhost:5678 loads the n8n dashboard
-- [ ] Your workflow is imported and visible
+- [ ] Your workflow is imported, visible, and **toggled to Active**
+- [ ] Click **Test workflow** in n8n — it should process your latest blog post and generate content
 - [ ] Your RSS feed URL (`yourdomain.com/feed`) returns valid XML in a browser
 - [ ] Slack webhook sends a test message (use n8n's "Test" button on the Notify Slack node)
 - [ ] At least one publishing platform is connected (check `.env`)
