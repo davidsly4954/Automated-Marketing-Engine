@@ -8,6 +8,22 @@
 
 A self-hosted content repurposing pipeline that watches your blog's RSS feed and automatically generates platform-optimized content for LinkedIn, Twitter/X, Reddit, Email, Dev.to, Hashnode, Indie Hackers, and LinkedIn Carousels — all scheduled on a 7-day drip calendar.
 
+## Why Content Repurposing Matters
+
+Most founders write a blog post, share it once on social media, and move on. That's leaving 80% of the value on the table. The research is clear:
+
+**The reach multiplier is real.** Audiences across platforms have only 15–25% overlap. A post that reaches 1,000 people on LinkedIn reaches a largely *different* 1,000 on Twitter, Reddit, and Dev.to. Systematic repurposing produces a documented **3–5x reach increase** from a single article — Buffer's internal team measured a 400% reach increase when they adopted this approach.
+
+**Each platform converts differently.** LinkedIn drives a 2.74% conversion rate for B2B — nearly 3x higher than Twitter or Facebook — and generates 80% of all B2B social media leads. Email achieves 2–5% click-through rates. Dev.to and Hashnode cross-posts build domain authority through high-DR backlinks that compound over months. Reddit builds trust that converts through organic search later. The pipeline lets you capture all of these channels from one piece of writing.
+
+**SEO compounds over time.** Cross-posting to Dev.to (DR 78) and Hashnode with canonical URLs pointing back to your blog builds your domain authority without duplicate content penalties. Content marketing costs 62% less than traditional marketing while generating 3x more leads, and B2B SaaS companies average 702% ROI on SEO with a 7-month breakeven.
+
+**Copy-pasting doesn't work.** The single most common mistake in content repurposing is publishing identical content across platforms. Each platform has different norms, audiences, and algorithms. A LinkedIn post needs a hook-driven professional format. A Reddit post needs casual peer-to-peer authenticity. An email needs a curiosity gap that drives clicks. This pipeline uses Claude AI to transform your content into platform-native formats — not just repost the same text everywhere.
+
+**The time math works.** Writing 8 pieces of original content from scratch takes 8–16 hours per week. This pipeline produces all 8 from a single blog post with ~30 minutes of human review. Justin Welsh built a $5M+ solo business on this model (his repurposed posts average 3,220 interactions vs. 900 for originals — a 3.5x multiplier). The 7-day drip schedule extends a single article's relevance across an entire week.
+
+**It costs almost nothing.** Each blog post costs ~$0.15 in Claude API calls to transform into all 8 formats. The entire pipeline runs on free, self-hosted infrastructure. Compare that to hiring a content team or paying $200+/month for SaaS repurposing tools that do less.
+
 ## Pipeline
 
 ![n8n Content Repurposing Pipeline](docs/pipeline-screenshot.png)
