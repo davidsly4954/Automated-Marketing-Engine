@@ -1,0 +1,555 @@
+{
+  "name": "YourCompany Content Repurposing Pipeline",
+  "nodes": [
+    {
+      "id": "acdcdf59-ba18-4b82-9799-7289197558b3",
+      "name": "Setup Instructions",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        -200
+      ],
+      "parameters": {
+        "content": "## Content Repurposing Pipeline\n\n**Setup before activating:**\n1. Add `ANTHROPIC_API_KEY` to .env and restart containers\n2. Set Slack webhook URL in \"Notify Slack\" node\n3. Verify RSS feed URL in trigger node\n\n**Publishing nodes (enable as you sign up):**\n- Buffer: Set `BUFFER_ACCESS_TOKEN` env + LinkedIn profile ID\n- Typefully: Set `TYPEFULLY_API_KEY` env + social_set_id\n- Dev.to: Set `DEVTO_API_KEY` env\n- Hashnode: Set `HASHNODE_PAT` env + publication ID\n- Loops.so: Set `LOOPS_API_KEY` env + transactional template ID\n\n**Drip schedule:**\n- Day 1: LinkedIn (10AM) + Twitter (12PM)\n- Day 2: Email newsletter (10AM)\n- Day 3: Carousel outline saved (manual Canva)\n- Day 4: Reddit draft saved (manual post)\n- Day 5: Dev.to + Hashnode (auto cross-post)\n- Day 7: Indie Hackers draft saved (manual post)\n\n**Cost per run:** ~$0.15 Claude API",
+        "width": 450,
+        "height": 420
+      }
+    },
+    {
+      "id": "e948b67f-98a6-4526-a432-9ddccae7ef8e",
+      "name": "Drip Calendar",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1680,
+        -200
+      ],
+      "parameters": {
+        "content": "## 7-Day Drip Release Calendar\n\n| Day | Platform | Time | Auto? |\n|-----|----------|------|-------|\n| 1 (Tue) | LinkedIn | 10-11 AM | Buffer |\n| 1 (Tue) | Twitter/X | 12-1 PM | Typefully |\n| 2 (Wed) | Email | 10 AM | Loops.so |\n| 3 (Thu) | Carousel | 10 AM | Manual Canva |\n| 4 (Fri) | Reddit #1 | 8 AM | Manual post |\n| 5 (Mon) | Dev.to | Anytime | Auto API |\n| 5 (Mon) | Hashnode | Anytime | Auto API |\n| 6 (Tue) | Reddit #2 | 9 AM | Manual post |\n| 7 (Wed) | Indie Hackers | AM | Manual post |",
+        "width": 350,
+        "height": 320
+      }
+    },
+    {
+      "id": "c0aa432b-514e-401e-ba8f-0d99161bdc65",
+      "name": "Blog RSS Trigger",
+      "type": "n8n-nodes-base.rssFeedReadTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "feedUrl": "https://yourdomain.com/feed",
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "value": 20,
+              "unit": "minutes"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "f4e56fd3-3f31-4ae6-a06c-23c05b0a9cd9",
+      "name": "Fetch Blog Content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        280,
+        300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "=https://r.jina.ai/{{ $json.link }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 3
+    },
+    {
+      "id": "fec24a11-4292-4e47-86ec-0004d6cb5853",
+      "name": "Prepare & Dedup",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const rssItem = $('Blog RSS Trigger').first().json;\nconst fetchResponse = $input.first().json;\n\nconst blogTitle = rssItem.title || 'Untitled';\nconst blogUrl = rssItem.link || '';\nconst blogSlug = blogUrl.split('/').filter(Boolean).pop() || 'untitled';\nconst pubDate = rssItem.pubDate || rssItem.isoDate || new Date().toISOString();\n\nlet blogContent = '';\nif (fetchResponse && fetchResponse.data && fetchResponse.data.content) {\n  blogContent = fetchResponse.data.content;\n} else if (rssItem.content) {\n  blogContent = rssItem.content;\n} else if (rssItem.contentSnippet) {\n  blogContent = rssItem.contentSnippet;\n}\n\nif (!blogContent || blogContent.length < 100) {\n  throw new Error('Blog content too short or empty. Check RSS feed and Jina.ai response.');\n}\n\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.processedUrls) staticData.processedUrls = [];\nif (staticData.processedUrls.includes(blogUrl)) {\n  return [];\n}\nstaticData.processedUrls.push(blogUrl);\nif (staticData.processedUrls.length > 200) {\n  staticData.processedUrls = staticData.processedUrls.slice(-200);\n}\n\nconst systemPrompt = \"You are a content strategist and ghostwriter for YourCompany, a SaaS helping businesses with [your value proposition]. The founder is a solo technical builder sharing hard-won insights.\\n\\n<brand_voice>\\nTone: Technical but accessible. Confident, not arrogant. Think \\\"experienced practitioner explaining to a smart colleague.\\\"\\nAvoid: \\\"leverage,\\\" \\\"synergy,\\\" \\\"delve,\\\" \\\"In today's rapidly evolving landscape,\\\" \\\"game-changer,\\\" \\\"cutting-edge,\\\" \\\"revolutionary\\\"\\nEmbrace: Specific technical details, real-world examples, contrarian takes, founder vulnerability\\n</brand_voice>\\n\\n<constraints>\\n- Output must sound human-written and opinionated\\n- Preserve technical accuracy of all your industry concepts\\n- Include specific tools, data, or frameworks when the source does\\n- Always include data/statistics from the source material\\n</constraints>\";\n\nconst extractionPrompt = \"Extract the following from this blog post. Output ONLY valid JSON, no other text.\\n\\n{\\n  \\\"core_thesis\\\": \\\"one sentence summary of the main argument\\\",\\n  \\\"key_statistics\\\": [\\\"stat1\\\", \\\"stat2\\\"],\\n  \\\"supporting_arguments\\\": [\\\"arg1\\\", \\\"arg2\\\", \\\"arg3\\\"],\\n  \\\"technical_details\\\": [\\\"detail1\\\", \\\"detail2\\\"],\\n  \\\"hook_angles\\\": [\\\"hook1\\\", \\\"hook2\\\", \\\"hook3\\\"],\\n  \\\"actionable_takeaway\\\": \\\"the primary action readers should take\\\"\\n}\\n\\nBlog post title: {{TITLE}}\\n\\nBlog post content:\\n{{CONTENT}}\"\n  .replace('{{TITLE}}', blogTitle)\n  .replace('{{CONTENT}}', blogContent);\n\nconst requestBody = JSON.stringify({\n  model: 'claude-sonnet-4-6',\n  max_tokens: 1500,\n  temperature: 0.3,\n  system: systemPrompt,\n  messages: [{ role: 'user', content: extractionPrompt }]\n});\n\nreturn [{\n  json: {\n    blogTitle, blogUrl, blogSlug, blogContent, pubDate,\n    systemPrompt, extractionRequestBody: requestBody\n  }\n}];"
+      }
+    },
+    {
+      "id": "022f04ef-7883-4328-9d47-fa3debd9da76",
+      "name": "Extract Key Points",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        840,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.ANTHROPIC_API_KEY }}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.extractionRequestBody }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3
+    },
+    {
+      "id": "93ccf65a-7288-4c1f-83ec-926ff726e8a6",
+      "name": "Create Platform Prompts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const blogData = $('Prepare & Dedup').first().json;\nconst claudeResponse = $input.first().json;\nconst extraction = claudeResponse.content[0].text;\nconst systemPrompt = blogData.systemPrompt;\nconst blogContent = blogData.blogContent;\nconst blogTitle = blogData.blogTitle;\nconst blogUrl = blogData.blogUrl;\n\nconst platforms = [\n  {\n    \"platform\": \"linkedin_post\",\n    \"temperature\": 0.6,\n    \"max_tokens\": 800,\n    \"prompt\": \"Using the key points and full blog post below, write a LinkedIn post.\\n\\nRequirements:\\n- 1,000-1,300 characters total\\n- First line MUST compel \\\"see more\\\" clicks — use a controversial opinion, surprising result, or provocative question\\n- Use blank lines between every short paragraph\\n- Write in first person. Sound like a founder sharing a lesson, not a brand posting content\\n- End with a question to drive comments\\n- Add 3-5 relevant hashtags after two blank lines at the end\\n- Include at least one specific data point or statistic from the source\\n- Depth level: medium (explain acronyms, add brief context)\\n\\nKEY POINTS:\\n{{EXTRACTION}}\\n\\nFULL BLOG POST:\\n{{CONTENT}}\"\n  },\n  {\n    \"platform\": \"twitter_thread\",\n    \"temperature\": 0.7,\n    \"max_tokens\": 1500,\n    \"prompt\": \"Using the key points and full blog post below, write a Twitter/X thread.\\n\\nRequirements:\\n- 5-8 tweets, each STRICTLY under 280 characters\\n- Separate each tweet with --- on its own line (Typefully format)\\n- Tweet 1 MUST be a provocative hook that works as a standalone post\\n- Each subsequent tweet delivers one key insight\\n- DO NOT include any URLs in the tweets (links get 94% reach suppression — the blog URL will be added in a reply)\\n- Use 1-2 hashtags maximum, only in the final tweet\\n- Tone: sharp, opinionated, punchy. Replace jargon with plain language\\n- Depth level: low (focus on business impact)\\n\\nKEY POINTS:\\n{{EXTRACTION}}\\n\\nFULL BLOG POST:\\n{{CONTENT}}\"\n  },\n  {\n    \"platform\": \"reddit_draft\",\n    \"temperature\": 0.7,\n    \"max_tokens\": 1200,\n    \"prompt\": \"Using the key points and full blog post below, write a Reddit discussion post for r/your_niche.\\n\\nRequirements:\\n- Write a discussion-style post title (question format works best)\\n- Casual, peer-to-peer tone — sound like a practitioner sharing findings, NOT a vendor selling\\n- NEVER mention YourCompany or any product name unless directly relevant to a technical finding\\n- No emojis. No marketing language. No superlatives\\n- Frame as sharing interesting research/findings with the community\\n- Include specific technical details (data points, tool names, config examples)\\n- End with a genuine question to spark discussion\\n- Depth level: high (keep technical specifics and data)\\n\\nOutput format:\\nTITLE: [post title]\\nSUBREDDIT: r/your_niche\\nBODY:\\n[post body]\\n\\nKEY POINTS:\\n{{EXTRACTION}}\\n\\nFULL BLOG POST:\\n{{CONTENT}}\"\n  },\n  {\n    \"platform\": \"email_newsletter\",\n    \"temperature\": 0.5,\n    \"max_tokens\": 600,\n    \"prompt\": \"Using the key points and full blog post below, write an email newsletter snippet.\\n\\nRequirements:\\n- TWO subject line options: one curiosity-driven, one benefit-driven, both under 50 characters\\n- Preview text line under 90 characters\\n- 100-150 word teaser body that creates an information gap\\n- Single clear CTA: \\\"Read the full analysis\\\" linking to the blog post\\n- Tone: informative, slightly urgent, personal\\n- Reference at least one specific statistic from the source\\n\\nOutput format:\\nSUBJECT_LINE_1: [curiosity-driven]\\nSUBJECT_LINE_2: [benefit-driven]\\nPREVIEW_TEXT: [under 90 chars]\\nBODY:\\n[teaser body with CTA]\\n\\nKEY POINTS:\\n{{EXTRACTION}}\\n\\nFULL BLOG POST:\\n{{CONTENT}}\"\n  },\n  {\n    \"platform\": \"carousel_outline\",\n    \"temperature\": 0.5,\n    \"max_tokens\": 1500,\n    \"prompt\": \"Using the key points and full blog post below, create a LinkedIn carousel outline.\\n\\nRequirements:\\n- 8-12 slides\\n- Slide 1: Bold cover headline (max 8 words) + subtitle\\n- Slides 2-N: One key point per slide, max 40 words each, with a brief supporting detail\\n- Final slide: CTA with \\\"Follow for more insights\\\"\\n- Each slide should be self-contained and visually clear\\n- Use numbers, percentages, and specific data wherever possible\\n- This outline will be designed in Canva\\n\\nOutput format:\\nSLIDE 1: [headline] / [subtitle]\\nSLIDE 2: [point] / [detail]\\n...\\nSLIDE N: [CTA]\\n\\nKEY POINTS:\\n{{EXTRACTION}}\\n\\nFULL BLOG POST:\\n{{CONTENT}}\"\n  },\n  {\n    \"platform\": \"devto_crosspost\",\n    \"temperature\": 0.4,\n    \"max_tokens\": 4000,\n    \"prompt\": \"Using the full blog post below, create a Dev.to cross-post.\\n\\nRequirements:\\n- Keep the full article content with minimal changes\\n- Add a brief intro line: \\\"*Originally published on [YourCompany]({{BLOG_URL}})*\\\"\\n- Format with Dev.to markdown conventions (## for headings, code blocks with language tags)\\n- Suggest 4 Dev.to tags from: startup, saas, programming, webdev\\n- Include the canonical_url in frontmatter\\n- Preserve all technical accuracy\\n\\nOutput format:\\n---\\ntitle: {{TITLE}}\\npublished: true\\ntags: [tag1, tag2, tag3, tag4]\\ncanonical_url: {{BLOG_URL}}\\n---\\n\\n[article content]\\n\\nKEY POINTS:\\n{{EXTRACTION}}\\n\\nFULL BLOG POST:\\n{{CONTENT}}\"\n  },\n  {\n    \"platform\": \"hashnode_crosspost\",\n    \"temperature\": 0.4,\n    \"max_tokens\": 4000,\n    \"prompt\": \"Using the full blog post below, create a Hashnode cross-post.\\n\\nRequirements:\\n- Keep the full article content with minimal changes\\n- Add at the top: \\\"*Originally published on [YourCompany]({{BLOG_URL}})*\\\"\\n- Format with standard markdown\\n- Suggest 3-5 Hashnode tags relevant to the content\\n- The originalArticleURL will be set via the Hashnode GraphQL API\\n- Preserve all technical accuracy\\n\\nOutput format:\\nTAGS: [tag1, tag2, tag3]\\n\\n[article content]\\n\\nKEY POINTS:\\n{{EXTRACTION}}\\n\\nFULL BLOG POST:\\n{{CONTENT}}\"\n  },\n  {\n    \"platform\": \"indiehackers_draft\",\n    \"temperature\": 0.7,\n    \"max_tokens\": 1000,\n    \"prompt\": \"Using the key points and full blog post below, write an Indie Hackers update post.\\n\\nRequirements:\\n- Building-in-public founder frame — share the insight as part of the YourCompany journey\\n- Include honest business context (what you learned, what surprised you, what failed)\\n- Conversational, personal tone — IH audience values authenticity and real numbers\\n- Keep it 200-400 words\\n- End with a question for the community\\n- Reference the blog post as \\\"wrote about this in more detail on our blog\\\"\\n- Depth level: low (focus on business impact and founder lessons)\\n\\nKEY POINTS:\\n{{EXTRACTION}}\\n\\nFULL BLOG POST:\\n{{CONTENT}}\"\n  }\n];\n\nreturn platforms.map(p => {\n  const userPrompt = p.prompt\n    .replace(/\\{\\{EXTRACTION\\}\\}/g, extraction)\n    .replace(/\\{\\{CONTENT\\}\\}/g, blogContent)\n    .replace(/\\{\\{TITLE\\}\\}/g, blogTitle)\n    .replace(/\\{\\{BLOG_URL\\}\\}/g, blogUrl);\n\n  const requestBody = JSON.stringify({\n    model: 'claude-sonnet-4-6',\n    max_tokens: p.max_tokens,\n    temperature: p.temperature,\n    system: systemPrompt,\n    messages: [{ role: 'user', content: userPrompt }]\n  });\n\n  return { json: { platform: p.platform, requestBody } };\n});"
+      }
+    },
+    {
+      "id": "9cc5b003-2728-4e1a-ad1e-c13bf4c4424d",
+      "name": "Generate Platform Content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1400,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.ANTHROPIC_API_KEY }}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.requestBody }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3
+    },
+    {
+      "id": "cd1ce336-0fd5-43a0-949e-027e03e1cce9",
+      "name": "Process & Schedule",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        300
+      ],
+      "parameters": {
+        "jsCode": "// Aggregate 8 platform responses, compute 7-day drip schedule, generate UTM links\nconst blogData = $('Prepare & Dedup').first().json;\nconst items = $input.all();\n\nconst platformOrder = [\n  'linkedin_post', 'twitter_thread', 'reddit_draft', 'email_newsletter',\n  'carousel_outline', 'devto_crosspost', 'hashnode_crosspost', 'indiehackers_draft'\n];\n\nconst results = {};\nconst errors = [];\n\nfor (let i = 0; i < items.length; i++) {\n  const platform = platformOrder[i];\n  try {\n    if (items[i].json.content && items[i].json.content[0]) {\n      results[platform] = items[i].json.content[0].text;\n    } else {\n      errors.push(platform + ': unexpected response format');\n      results[platform] = 'ERROR: Check execution log';\n    }\n  } catch (e) {\n    errors.push(platform + ': ' + e.message);\n    results[platform] = 'ERROR: ' + e.message;\n  }\n}\n\n// ── 7-day drip schedule ──\n// Find next Tuesday as Day 1 (or today if Tuesday)\nconst now = new Date();\nconst dayOfWeek = now.getUTCDay(); // 0=Sun, 2=Tue\nlet daysUntilTuesday = (2 - dayOfWeek + 7) % 7;\nif (daysUntilTuesday === 0 && now.getUTCHours() >= 18) daysUntilTuesday = 7;\n\nconst day1 = new Date(now);\nday1.setUTCDate(day1.getUTCDate() + daysUntilTuesday);\n\n// Helper: set scheduled time (adjust for your timezone offset in config)\nconst TZ_OFFSET = 0;\nconst scheduleAt = (dayOffset, hour) => {\n  const d = new Date(day1);\n  d.setUTCDate(d.getUTCDate() + dayOffset);\n  d.setUTCHours(hour + TZ_OFFSET, 0, 0, 0);\n  return d.toISOString();\n};\n\nconst schedule = {\n  linkedin:    scheduleAt(0, 10),  // Day 1 Tue 10AM\n  twitter:     scheduleAt(0, 12),  // Day 1 Tue 12PM\n  email:       scheduleAt(1, 10),  // Day 2 Wed 10AM\n  carousel:    scheduleAt(2, 10),  // Day 3 Thu 10AM (manual Canva)\n  reddit_1:    scheduleAt(3, 8),   // Day 4 Fri 8AM (manual)\n  devto:       scheduleAt(5, 9),   // Day 6 Mon 9AM (auto — 2-day delay for SEO)\n  hashnode:    scheduleAt(5, 9),   // Day 6 Mon 9AM (auto)\n  reddit_2:    scheduleAt(6, 9),   // Day 7 Tue 9AM (manual)\n  indiehackers: scheduleAt(7, 10)  // Day 8 Wed 10AM (manual)\n};\n\n// ── UTM links ──\nconst slug = blogData.blogSlug;\nconst base = blogData.blogUrl;\n\nconst utmLinks = {\n  linkedin:     base + '?utm_source=linkedin&utm_medium=social&utm_campaign=' + slug + '&utm_content=text-post',\n  twitter:      base + '?utm_source=twitter&utm_medium=social&utm_campaign=' + slug + '&utm_content=thread',\n  reddit:       base + '?utm_source=reddit&utm_medium=community&utm_campaign=' + slug + '&utm_content=discussion',\n  email:        base + '?utm_source=newsletter&utm_medium=email&utm_campaign=' + slug + '&utm_content=newsletter-cta',\n  devto:        base + '?utm_source=devto&utm_medium=cross-post&utm_campaign=' + slug + '&utm_content=article',\n  hashnode:     base + '?utm_source=hashnode&utm_medium=cross-post&utm_campaign=' + slug + '&utm_content=article',\n  indiehackers: base + '?utm_source=indiehackers&utm_medium=community&utm_campaign=' + slug + '&utm_content=update'\n};\n\nconst timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);\n\nreturn [{\n  json: {\n    blogTitle: blogData.blogTitle,\n    blogUrl: blogData.blogUrl,\n    blogSlug: slug,\n    pubDate: blogData.pubDate,\n    timestamp,\n    results,\n    schedule,\n    utmLinks,\n    errors,\n    platformCount: Object.keys(results).length,\n    errorCount: errors.length\n  }\n}];"
+      }
+    },
+    {
+      "id": "feeb9a73-7ba7-49e7-9ac5-c665a6663d1b",
+      "name": "Format Slack Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1960,
+        100
+      ],
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst r = data.results;\nconst s = data.schedule;\nconst trunc = (str, n) => str && str.length > n ? str.slice(0, n) + '...' : (str || 'N/A');\n\nconst errorLine = data.errorCount > 0\n  ? '\\n:warning: *Errors:* ' + data.errors.join(', ') : '';\n\nconst blocks = [\n  { type: 'header', text: { type: 'plain_text', text: 'New Content Ready for Review', emoji: true } },\n  { type: 'section', text: { type: 'mrkdwn',\n    text: '*Blog Post:* <' + data.blogUrl + '|' + data.blogTitle + '>\\n'\n      + '*Platforms:* ' + data.platformCount + ' drafts generated' + errorLine + '\\n'\n      + '*Drip starts:* ' + s.linkedin.slice(0,10)\n  }},\n  { type: 'divider' },\n  { type: 'section', text: { type: 'mrkdwn', text: '*LinkedIn Post* (scheduled ' + s.linkedin.slice(0,10) + '):\\n' + trunc(r.linkedin_post, 500) }},\n  { type: 'divider' },\n  { type: 'section', text: { type: 'mrkdwn', text: '*Twitter Thread* (scheduled ' + s.twitter.slice(0,10) + '):\\n' + trunc(r.twitter_thread, 500) }},\n  { type: 'divider' },\n  { type: 'section', text: { type: 'mrkdwn', text: '*Email Newsletter* (scheduled ' + s.email.slice(0,10) + '):\\n' + trunc(r.email_newsletter, 400) }},\n  { type: 'divider' },\n  { type: 'section', text: { type: 'mrkdwn', text: '*Reddit Draft* (manual post ' + s.reddit_1.slice(0,10) + '):\\n' + trunc(r.reddit_draft, 400) }},\n  { type: 'divider' },\n  { type: 'section', text: { type: 'mrkdwn', text: '*Carousel Outline* (manual Canva ' + s.carousel.slice(0,10) + '):\\n' + trunc(r.carousel_outline, 300) }},\n  { type: 'divider' },\n  { type: 'section', text: { type: 'mrkdwn',\n    text: '*Dev.to + Hashnode* (auto ' + s.devto.slice(0,10) + '): Full cross-posts ready\\n'\n      + '*Indie Hackers* (manual ' + s.indiehackers.slice(0,10) + '):\\n' + trunc(r.indiehackers_draft, 200)\n  }},\n  { type: 'divider' },\n  { type: 'context', elements: [{ type: 'mrkdwn',\n    text: 'Full content in <http://localhost:5678|n8n> execution log | UTM links auto-generated'\n  }]}\n];\n\nreturn [{ json: { ...data, slackBlocks: JSON.stringify({ blocks }),\n  slackText: 'New content: ' + data.blogTitle + ' (' + data.platformCount + ' platforms)'\n}}];"
+      }
+    },
+    {
+      "id": "5f2e502e-4004-4b9a-bbe3-358a85a888f8",
+      "name": "Notify Slack",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2240,
+        100
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "YOUR_SLACK_WEBHOOK_URL",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.slackBlocks }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "062b3b92-1f70-4220-8b7c-d6a4886c77d2",
+      "name": "Publish LinkedIn (Buffer)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1960,
+        400
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.bufferapp.com/1/updates/create.json",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/x-www-form-urlencoded"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "string",
+        "body": "=text={{ encodeURIComponent($json.results.linkedin_post + \"\\n\\n\" + $json.utmLinks.linkedin) }}&profile_ids[]={{ $env.BUFFER_LINKEDIN_PROFILE_ID }}&scheduled_at={{ $json.schedule.linkedin }}&access_token={{ $env.BUFFER_ACCESS_TOKEN }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "24760154-506a-42b2-b1b7-df16c160f369",
+      "name": "Publish Twitter (Typefully)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1960,
+        560
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.typefully.com/v2/social-sets/{{ $env.TYPEFULLY_SOCIAL_SET_ID }}/drafts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-KEY",
+              "value": "=Bearer {{ $env.TYPEFULLY_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ content: $json.results.twitter_thread, schedule: \"next-free-slot\", threadify: false, \"schedule-date\": $json.schedule.twitter }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "228d79a8-8592-49ac-ad75-715e094c5b12",
+      "name": "Send Email (Loops.so)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1960,
+        720
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://app.loops.so/api/v1/transactional",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.LOOPS_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ transactionalId: $env.LOOPS_NEWSLETTER_TEMPLATE_ID || \"YOUR_TEMPLATE_ID\", mailingList: \"Blog Subscribers\", dataVariables: { blogTitle: $json.blogTitle, blogUrl: $json.utmLinks.email, newsletterContent: $json.results.email_newsletter } }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "775e6ccf-22c8-425d-a175-45c6f1258a9e",
+      "name": "Publish Dev.to",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1960,
+        880
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://dev.to/api/articles",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api-key",
+              "value": "={{ $env.DEVTO_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ article: { title: $json.blogTitle, body_markdown: $json.results.devto_crosspost, published: true, canonical_url: $json.blogUrl } }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "aceebe27-ee90-4c13-adfd-32dc6b30f0c7",
+      "name": "Publish Hashnode",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1960,
+        1040
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://gql.hashnode.com",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $env.HASHNODE_PAT }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: \"mutation PublishPost($input: PublishPostInput!) { publishPost(input: $input) { post { id url } } }\", variables: { input: { title: $json.blogTitle, contentMarkdown: $json.results.hashnode_crosspost, publicationId: $env.HASHNODE_PUBLICATION_ID || \"YOUR_PUB_ID\", originalArticleURL: $json.blogUrl, tags: [] } } }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "dc3fdac2-6361-4234-a39d-fc0902a61a73",
+      "name": "Save Manual Drafts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1960,
+        1200
+      ],
+      "parameters": {
+        "jsCode": "// Prepare manual drafts for review — these get saved in the execution log\n// and appear in the Slack notification. Manual posting required.\nconst data = $input.first().json;\n\nconst manualDrafts = {\n  reddit: {\n    content: data.results.reddit_draft,\n    scheduledDate: data.schedule.reddit_1,\n    instructions: 'Post manually to your target subreddit. Review tone — must sound like a practitioner, NOT a vendor. No product mentions.'\n  },\n  carousel: {\n    content: data.results.carousel_outline,\n    scheduledDate: data.schedule.carousel,\n    instructions: 'Design in Canva using this outline. Post via Buffer on the scheduled date.'\n  },\n  indiehackers: {\n    content: data.results.indiehackers_draft,\n    scheduledDate: data.schedule.indiehackers,\n    instructions: 'Post to Indie Hackers. Add real revenue numbers and honest founder context before posting.'\n  }\n};\n\nreturn [{\n  json: {\n    blogTitle: data.blogTitle,\n    blogSlug: data.blogSlug,\n    manualDrafts,\n    message: 'Manual drafts saved. Check Slack #content-review and n8n execution log for full content.'\n  }\n}];"
+      }
+    }
+  ],
+  "connections": {
+    "Blog RSS Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Blog Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Blog Content": {
+      "main": [
+        [
+          {
+            "node": "Prepare & Dedup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare & Dedup": {
+      "main": [
+        [
+          {
+            "node": "Extract Key Points",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Key Points": {
+      "main": [
+        [
+          {
+            "node": "Create Platform Prompts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Platform Prompts": {
+      "main": [
+        [
+          {
+            "node": "Generate Platform Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Platform Content": {
+      "main": [
+        [
+          {
+            "node": "Process & Schedule",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process & Schedule": {
+      "main": [
+        [
+          {
+            "node": "Format Slack Message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Publish LinkedIn (Buffer)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Publish Twitter (Typefully)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Email (Loops.so)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Publish Dev.to",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Publish Hashnode",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Save Manual Drafts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Slack Message": {
+      "main": [
+        [
+          {
+            "node": "Notify Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": {
+    "global": {
+      "processedUrls": []
+    }
+  },
+  "pinData": {},
+  "active": false
+}
