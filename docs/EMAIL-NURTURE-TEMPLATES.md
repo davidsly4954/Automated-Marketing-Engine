@@ -3,7 +3,7 @@
 A framework for building an automated email nurture sequence in Loops.so (or any email tool).
 Customize the content, merge tags, and cadence for your product.
 
-**Trigger:** User completes your lead magnet (free scan, free trial, free report, etc.)
+**Trigger:** User completes your lead magnet (free tool, free trial, downloadable resource, etc.)
 **Cadence:** Days 0, 3, 7, 10, 14, 21, 28
 **Send time:** Tuesday/Wednesday 9-11 AM recipient local timezone
 **Suppression:** Max 1 email per 24-48 hrs, exit on conversion
@@ -15,11 +15,10 @@ Customize the content, merge tags, and cadence for your product.
 Customize these for your product:
 
 ```
-result_score        (string)  — grade, score, or outcome from your lead magnet
-total_findings      (number)  — number of issues/results/recommendations found
+result_summary      (string)  — outcome or key takeaway from the lead magnet
+total_results       (number)  — number of items/insights/recommendations generated
 key_metric_1        (number)  — primary metric relevant to your product
-key_metric_2        (number)  — secondary metric
-user_domain         (string)  — user's domain or company identifier
+user_identifier     (string)  — user's domain, username, or company name
 company_name        (string)  — company name
 action_date         (string)  — ISO date of the triggering action
 plan_interest       (string)  — which tier they're most likely to buy
@@ -38,59 +37,59 @@ plan_interest       (string)  — which tier they're most likely to buy
 **Target open rate: 60-80%** (users are expecting this)
 
 **Subject lines (test all 3):**
-- Your [product] found {{ total_findings }} [issues/opportunities]
-- {{ key_metric_1 }} [key findings] on {{ user_domain }}
-- {{ company_name }}'s [product] results are ready
+- Your [product] results: {{ total_results }} [items/insights] found
+- {{ user_identifier }}'s [product] report is ready
+- Here's what we found for {{ company_name }}
 
-**Preview text:** Your [score type]: {{ result_score }} — see full breakdown inside
+**Preview text:** {{ total_results }} results ready — see the full breakdown inside
 
 **Body:**
 
 Hi {{ first_name }},
 
-Your [product action] on **{{ user_domain }}** is complete.
+Your [product action] for **{{ user_identifier }}** is complete.
 
-**Your [Score Type]: {{ result_score }}**
+**Summary:** {{ result_summary }}
 
 [Include a summary table or key metrics from the user's results]
 
-[View Your Full Report →]({{ dashboard_url }})
+[View Your Full Results →]({{ results_url }})
 
-Over the next few weeks, I'll send you practical guidance on what these findings mean and how to act on them.
+Over the next few weeks, I'll send you practical guidance on what these results mean and how to act on them.
 
 — [Your Name], [YourCompany]
 
-**CTA button:** View Your Full Report
+**CTA button:** View Your Full Results
 
 ---
 
 ## EMAIL 2 — Day 3: Education
 
-**Goal:** Help the user understand their #1 finding. Build trust through expertise.
+**Goal:** Help the user understand their #1 result. Build trust through expertise.
 
-**Subject:** What your top finding actually means for {{ company_name }}
+**Subject:** What your top result actually means for {{ company_name }}
 
 **Body framework:**
-- Reference their specific result: "Your [product] flagged [X] as your highest priority..."
-- Explain why it matters (business impact, not just technical details)
+- Reference their specific result: "Your [product] identified [X] as your top priority..."
+- Explain why it matters (business impact, not just raw data)
 - Provide 2-3 actionable steps they can take right now
 - Sign off with credibility: link to a relevant blog post
 
 ---
 
-## EMAIL 3 — Day 7: Compliance / Industry Angle
+## EMAIL 3 — Day 7: Industry / Standards Angle
 
-**Goal:** Connect findings to an industry framework, regulation, or standard that matters to your buyer.
+**Goal:** Connect results to an industry standard, best practice, or benchmark that matters to your buyer.
 
-**Subject:** 3 findings that would flag during [relevant audit/review]
+**Subject:** 3 results that would stand out in a [industry review/benchmark]
 
 **Body framework:**
 - Reference their specific metrics
-- Map findings to industry requirements (SOC 2, GDPR, ISO, HIPAA, PCI — whatever applies to your niche)
-- Show the gap between current state and required state
-- Quantify the risk (fines, audit failures, lost deals)
+- Compare to industry benchmarks or best practices in your niche
+- Show the gap between their current state and where top performers are
+- Quantify the cost of inaction (lost revenue, missed opportunities, inefficiency)
 
-**Note:** This is typically the highest-converting email in B2B SaaS nurture sequences. Compliance urgency drives action.
+**Note:** This is typically the highest-converting email in B2B SaaS nurture sequences. Urgency tied to industry standards drives action.
 
 ---
 
@@ -113,12 +112,12 @@ Over the next few weeks, I'll send you practical guidance on what these findings
 
 **Goal:** Plant the seed that the free version only shows the surface.
 
-**Subject:** 5 things your free [product] can't check
+**Subject:** 5 things your free [product] can't do
 
 **Body framework:**
 - Acknowledge the value of the free version
-- List 5 things the paid version covers that the free version doesn't
-- Frame each as a risk or blind spot
+- List 5 capabilities the paid version adds that the free version doesn't
+- Frame each as a missed opportunity or blind spot
 - Each item should feel like "I didn't know I needed that"
 - No hard sell — educational tone
 
@@ -131,7 +130,7 @@ Over the next few weeks, I'll send you practical guidance on what these findings
 **Subject:** [YourCompany] Pro from $[PRICE]/month
 
 **Body framework:**
-- Reference their original results: "When you [took action] {{ action_date }}, we found {{ total_findings }} [issues]..."
+- Reference their original results: "When you [took action] on {{ action_date }}, we found {{ total_results }} [items]..."
 - Restate the value: what they get, what problems it solves
 - Present pricing tiers clearly
 - Include the strongest social proof point
@@ -144,11 +143,11 @@ Over the next few weeks, I'll send you practical guidance on what these findings
 
 **Goal:** Restart the funnel. Whether they converted or not, bring them back.
 
-**Subject:** [Do the free action] again — see what's changed
+**Subject:** Try [the free action] again — see what's changed
 
 **Body framework:**
 - "It's been 4 weeks since your last [action]..."
-- Explain what might have changed
+- Explain what might have changed since then
 - Single CTA to retake the free action
 - This resets Day 0 if they take action again
 
@@ -159,7 +158,7 @@ Over the next few weeks, I'll send you practical guidance on what these findings
 These override the standard sequence timing:
 
 - **Visits pricing page** → Skip to Email 6 (Direct Offer) immediately
-- **Uses dashboard 3+ times** → Send Email 5 (Depth Gap) early
+- **Uses product 3+ times** → Send Email 5 (Depth Gap) early
 - **Converts** → Exit sequence, move to onboarding
 - **Unsubscribes** → Respect immediately, never re-add
 
@@ -169,7 +168,7 @@ These override the standard sequence timing:
 |-------|-----------------|-------------------|
 | 1 (Results) | 60-80% | 40-60% |
 | 2 (Education) | 45-55% | 8-12% |
-| 3 (Compliance) | 40-50% | 10-15% |
+| 3 (Industry) | 40-50% | 10-15% |
 | 4 (Social Proof) | 35-45% | 8-12% |
 | 5 (Depth Gap) | 35-45% | 10-15% |
 | 6 (Direct Offer) | 30-40% | 5-8% |
